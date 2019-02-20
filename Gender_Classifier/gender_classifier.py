@@ -29,7 +29,7 @@ if device_name != '/device:GPU:0':
   raise SystemError('GPU device not found')
 print('Found GPU at: {}'.format(device_name))
 
-url = 'https://raw.githubusercontent.com/Raymond-Su/TensorFlowNameRecogniser/master/name_gender.csv'
+url = 'https://raw.githubusercontent.com/Raymond-Su/TensorFlowNameRecogniser/master/Gender_Classifier/name_gender.csv'
 df = pd.read_csv(url)
 df.columns = ['Name','Gender','Score']
 
