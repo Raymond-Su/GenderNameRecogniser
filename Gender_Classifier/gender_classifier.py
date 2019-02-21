@@ -17,20 +17,19 @@ from keras.datasets import imdb
 from keras.models import Sequential
 from keras.layers import Activation, Dense, Dropout, Conv1D, MaxPooling1D
 from sklearn.preprocessing import OneHotEncoder
+from pathlib import Path
 
 # Helper libraries
 import numpy as np
 import pandas as pd 
-from sklearn.model_selection import train_test_split
 
-url = 'https://raw.githubusercontent.com/Raymond-Su/TensorFlowNameRecogniser/master/Gender_Classifier/name_gender.csv'
-df = pd.read_csv(url)
+data_dir = Path("Gender_Classifier")
+df = pd.read_csv(data_dir /'name_gender.csv')
 df.columns = ['Name','Gender','Score']
 
 # Parameters
 predictor_col = 'Name'
 result_col = 'Gender'
-
 accepted_chars = 'abcdefghijklmnopqrstuvwxyz'
 
 word_vec_length = min(df[predictor_col].apply(len).max(), 25) # Length of the input vector
@@ -77,45 +76,47 @@ def lable_encoding(gender_series):
     return labels
 
 def main() :
-  # Split dataset in 60% train, 20% test and 20% validation
-  train, validate, test = np.split(df.sample(frac=1), [int(.6*len(df)), int(.8*len(df))])
-  print(len(validate))
-  # Convert both the input names as well as the output lables into the discussed machine readable vector format
-  train_x =  np.asarray([np.asarray(name_encoding(normalize(name))) for name in train[predictor_col]])
-  train_y = lable_encoding(train.Gender)
+    print("Starting to train Deep Learning Model")
+    # Split dataset in 60% train, 20% test and 20% validation
+    print("Splitting dataset...")
+    train, validate, test = np.split(df.sample(frac=1), [int(.6*len(df)), int(.8*len(df))])
+    # Convert both the input names as well as the output lables into the discussed machine readable vector format
+    train_x =  np.asarray([np.asarray(name_encoding(normalize(name))) for name in train[predictor_col]])
+    train_y = lable_encoding(train.Gender)
 
-  validate_x = np.asarray([name_encoding(normalize(name)) for name in validate[predictor_col]])
-  validate_y = lable_encoding(validate.Gender)
+    validate_x = np.asarray([name_encoding(normalize(name)) for name in validate[predictor_col]])
+    validate_y = lable_encoding(validate.Gender)
 
-  test_x = np.asarray([name_encoding(normalize(name)) for name in test[predictor_col]])
-  test_y = lable_encoding(test.Gender)
+    test_x = np.asarray([name_encoding(normalize(name)) for name in test[predictor_col]])
+    test_y = lable_encoding(test.Gender)
 
-  hidden_nodes = int(2/3 * (word_vec_length * char_vec_length))
-  print(f"The number of hidden nodes is {hidden_nodes}.")
+    hidden_nodes = int(2/3 * (word_vec_length * char_vec_length))
 
-  # Build the model
-  print('Build model...')
-  model = Sequential()
-  model.add(LSTM(hidden_nodes, return_sequences=True, input_shape=(word_vec_length, char_vec_length)))
-  model.add(Dropout(0.2))
-  model.add(LSTM(hidden_nodes, return_sequences=False))
-  model.add(Dropout(0.2))
-  model.add(Dense(units=output_labels))
-  model.add(Activation('softmax'))
-  model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['acc'])
+    # Build the model
+    print('Build model...')
+    model = Sequential()
+    model.add(LSTM(hidden_nodes, return_sequences=True, input_shape=(word_vec_length, char_vec_length)))
+    model.add(Dropout(0.2))
+    model.add(LSTM(hidden_nodes, return_sequences=False))
+    model.add(Dropout(0.2))
+    model.add(Dense(units=output_labels))
+    model.add(Activation('softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['acc'])
+    
+    print("Training Model..")
+    batch_size=1000
+    model.fit(train_x, train_y, batch_size=batch_size, epochs=50, validation_data=(validate_x, validate_y))
 
-  batch_size=1000
-  model.fit(train_x, train_y, batch_size=batch_size, epochs=50, validation_data=(validate_x, validate_y))
+    print("Testing model...")
+    score, acc = model.evaluate(test_x, test_y)
 
-  validate['predicted_gender'] = ['m' if prediction[0] > prediction[1] else 'f' for prediction in model.predict(validate_x)]
-  validate[validate['Gender'] != validate['predicted_gender']].head()
-
-  score, acc = model.evaluate(test_x, test_y)
-
-  print('Test score:', score)
-  print('Test accuracy:', acc)
-
-  model.save('gender_model.h5')
+    print('Test score:', score)
+    print('Test accuracy:', acc)
+    
+    print("Saving Model...")
+    model.save('Gender_Classifier/gender_model.h5',overwrite=True)
+    
+    print("Model Created")
 
 if __name__ == "__main__":
    # stuff only to run when not called via 'import' here
