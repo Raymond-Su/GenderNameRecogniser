@@ -1,7 +1,7 @@
 from flask import Flask,jsonify
 from flask_restplus import Api, fields, Resource
 from pathlib import Path
-from Gender_Classifier.gender_classifier import normalize, name_encoding, main
+from Gender_Classifier import main, normalize, name_encoding
 
 import tensorflow as tf
 import numpy as np
