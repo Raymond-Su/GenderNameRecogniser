@@ -1,1 +1,1 @@
-from Gender_Classifier.gender_classifier import normalize, name_encoding, main
+from Gender_Classifier.gender_classifier import normalize, name_encoding, retrainModel
