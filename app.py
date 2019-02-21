@@ -1,8 +1,9 @@
-from flask import Flask
+from flask import Flask,jsonify
 from flask_restplus import Api, fields, Resource
+from pathlib import Path
+from Gender_Classifier.gender_classifier import normalize, name_encoding
 import tensorflow as tf
 import numpy as np
-import string
 
 app = Flask(__name__)
 
@@ -14,67 +15,46 @@ api = Api(
 
 ns = api.namespace('ClassifyGender')
 
+class NullableString(fields.String):
+    __schema_type__ = ['string', 'null']
+    __schema_example__ = 'nullable string'
+    
 parser = api.parser()
 parser.add_argument(
     'Name', 
-    type= str, 
     required=True, 
     help='The persons name',
-    location='form')
+    location='form',
+    action='append')
 
 @ns.route('/')
 class GenderApi(Resource):
     @api.doc(parser=parser)
-    
     def post(self):
-        args = parser.parse_args()
-        name = args["Name"]
-        if(name.isalpha()):
-            result = self.get_result(name)
-            return result, 200
-        else:
-            response = app.response_class(response="Error",status=404)
-            return response
+        args = parser.parse_args(strict=True)
+        nameList = args["Name"]
+        resultList = []
+        for name in nameList:
+            if(name.isalpha()):
+                result = self.get_result(name)
+                resultList.append(result)
+            else:
+                return app.response_class(response="Error",status=404)
         
-
-    accepted_chars = 'abcdefghijklmnopqrstuvwxyz'
+        response = jsonify(resultList)
+        response.status_code=200
+        return response
 
     def get_result(self, name):
-        model = tf.keras.models.load_model('./gender_model.h5')
-        confidence = {'Male':0, 'Female':0}
+        model_dir = Path("Gender_Classifier/gender_model.h5")
+        model = tf.keras.models.load_model(model_dir)
+        result = {'Name':name,'Male':0, 'Female':0}
         nameList = []
         nameList.append(name)
-        prediction = model.predict(np.asarray([np.asarray(self.name_encoding(self.normalize(name))) for name in nameList]))
-        confidence['Male'] = (prediction.tolist())[0][0]
-        confidence['Female'] = (prediction.tolist())[0][1]
-        return {
-            "Name": name,
-            "Male": confidence['Male'],
-            "Female": confidence['Female']
-        }
-
-    def normalize(self,line):
-        return [c.lower() for c in line if c.lower() in self.accepted_chars]
-
-    def name_encoding(self, name):
-        max_len = 15
-        char_to_int = dict((c, i) for i, c in enumerate(self.accepted_chars))
-        int_to_char = dict((i, c) for i, c in enumerate(self.accepted_chars))
-        # Encode input data to int, e.g. a->1, z->26
-        integer_encoded = [char_to_int[char] for i, char in enumerate(name) if i < 26]
-        onehot_encoded = list()
-        
-        for value in integer_encoded:
-            # create a list of n zeros, where n is equal to the number of accepted characters
-            letter = [0 for _ in range(len(self.accepted_chars))]
-            letter[value] = 1
-            onehot_encoded.append(letter)
-            
-        # Fill up list to the max length. Lists need do have equal length to be able to convert it into an array
-        for _ in range(max_len - len(name)):
-            onehot_encoded.append([0 for _ in range(len(self.accepted_chars))])
-            
-        return onehot_encoded
+        prediction = model.predict(np.asarray([np.asarray(name_encoding(normalize(name))) for name in nameList]))
+        result['Male'] = (prediction.tolist())[0][0]
+        result['Female'] = (prediction.tolist())[0][1]
+        return result
 
 if __name__ == '__main__':
     app.run('0.0.0.0',debug=True)
